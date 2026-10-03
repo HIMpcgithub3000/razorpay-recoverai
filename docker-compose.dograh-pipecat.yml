@@ -1,0 +1,19 @@
+services:
+  dograh-pipecat-voice:
+    build:
+      context: ./dograh-pipecat-service
+      dockerfile: Dockerfile
+    container_name: dograh_pipecat_voice_agent
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8080
+    volumes:
+      - ./dograh-pipecat-service/server.py:/app/server.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
