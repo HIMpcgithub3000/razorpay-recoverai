@@ -1,7 +1,7 @@
 # Razorpay RecoverAI — System Architecture & Technical Specification
 
 > **Autonomous AI Voice Platform for Failed Recurring Autopay Recovery**  
-> *Engineered for High-Concurreny Subscription Recovery across India (UPI Autopay / e-NACH) and US Enterprise (ACH Direct Debit / Stripe)*
+> *Engineered for High-Concurrency Subscription Recovery across India (UPI Autopay / e-NACH) and US Enterprise (ACH Direct Debit / Stripe)*
 
 ---
 
@@ -17,36 +17,45 @@ Traditional recovery approaches rely on passive, easily ignored email dunning or
 
 ---
 
-## 2. High-Level Architecture Diagram
+## 2. High-Level System Design & Component Architecture
 
 ```mermaid
 flowchart TB
     subgraph WebhookSource["Payment Gateways & Banking Rails"]
-        RZP["Razorpay Core Engine<br/>(UPI Autopay / e-NACH)"]
-        STRIPE["Stripe Billing<br/>(US ACH / Corporate Cards)"]
+        RZP["Razorpay Core Webhook Engine<br/>(UPI Autopay · e-NACH · Cards)"]
+        STRIPE["Stripe Billing Webhook<br/>(US ACH · Corporate Amex)"]
         CORE_BANK["Core Banking NPCI Switch<br/>(HDFC, ICICI, SBI, Chase, SVB)"]
     end
 
     subgraph Ingestion["Ingestion & Intelligence Layer"]
-        WH_API["/api/webhooks/payment-failure<br/>(HMAC Signature Verification)"]
-        DECISION["Decision & Recovery Engine<br/>(Risk Scoring · Churn Modeling · Rail Analysis)"]
+        WH_API["/api/webhooks/payment-failure<br/>(HMAC-SHA256 Signature Verification)"]
+        DECISION["Decision & Recovery Scoring Engine<br/>(HPRI Scoring · Churn Risk · Rail Analysis)"]
         QUEUE["Segregated Regional Queue<br/>🇮🇳 India Domestic (INR) · 🇺🇸 US Enterprise (USD)"]
     end
 
-    subgraph VoiceDualEngine["Dual Voice Recovery Orchestration"]
-        subgraph SelfHosted["Dockerized Dograh + Pipecat Service (:8080)"]
+    subgraph Sentinels["Security & Policy Sentinels"]
+        SENT_PCI["🛡️ PCI-DSS Zero-CVV Sentinel<br/>(Blocks raw PIN / CVV collection)"]
+        SENT_TRAI["⏰ TRAI 9AM–9PM & DND Sentinel<br/>(Enforces legal calling windows)"]
+        SENT_RATE["🛑 Dunning Anti-Harassment Sentinel<br/>(Max 2 recovery calls / event)"]
+        SENT_EMO["⚡ Customer Agitation Sentinel<br/>(Triggers immediate human escalation)"]
+    end
+
+    subgraph DualVoiceEngine["Dual Voice Recovery Orchestration"]
+        subgraph SelfHosted["🐳 Primary: Dograh + Pipecat Service (:8080)"]
             FASTAPI["FastAPI Media Bridge"]
-            PROSODY["Dograh Screenplay Prosody Engine<br/>(, . ... ? Inflection Shaping)"]
-            EDGE_TTS["Microsoft Neural Edge-TTS Engine<br/>(Swara / Madhur / Aria / Jenny / Neerja)"]
+            PROSODY["Dograh Screenplay Prosody Engine<br/>(, . ... ? Acoustic Shaping)"]
+            EDGE_TTS["Microsoft Neural Edge-TTS Engine<br/>(Swara · Madhur · Aria · Guy · Neerja)"]
             PIPECAT["Pipecat Audio Frame Pipeline<br/>(16kHz PCM · WebSocket Streaming)"]
         end
 
-        subgraph FullService["Vapi AI Managed Cloud"]
-            DEEPGRAM["Deepgram Nova-3 STT"]
+        subgraph FullService["⚡ Secondary / Fallback: Vapi AI Cloud"]
+            DEEPGRAM["Deepgram Nova-3 STT<br/>(Hinglish & English Code-Switching)"]
             VAPI_CORE["Vapi In-Call State Machine"]
-            ELEVEN["ElevenLabs Multilingual TTS"]
+            ELEVEN["ElevenLabs Multilingual v2 TTS"]
             PSTN["Twilio / Vonage PSTN Phone Dialing"]
         end
+
+        CIRCUIT["Circuit Breaker & Fallback Router<br/>(Health Ping · Auto-Failover to Secondary)"]
     end
 
     subgraph ActionExecution["Autonomous Recovery Actions"]
@@ -63,12 +72,14 @@ flowchart TB
     end
 
     RZP & STRIPE & CORE_BANK --> WH_API
-    WH_API --> DECISION
+    WH_API --> Sentinels
+    Sentinels --> DECISION
     DECISION --> QUEUE
     QUEUE --> STUDIO
 
-    STUDIO -->|Self-Hosted Mode| FASTAPI
-    STUDIO -->|Full-Service Mode| VAPI_CORE
+    STUDIO --> CIRCUIT
+    CIRCUIT -->|Health: OK| FASTAPI
+    CIRCUIT -->|Service Down / Failover| VAPI_CORE
 
     FASTAPI --> PROSODY --> EDGE_TTS & PIPECAT
     VAPI_CORE --> DEEPGRAM & ELEVEN & PSTN
@@ -79,172 +90,151 @@ flowchart TB
 
 ---
 
-## 3. Dual-Engine Telephony & Voice Pipeline
+## 3. Technology Stack: STT, TTS, LLM & Dograh AI
 
-Razorpay RecoverAI implements a **Zero-Vendor-Lockin Dual Engine Architecture**:
+### A. Speech-to-Text (STT) Architecture
+| Provider / Tool | Pipeline | Latency | Key Rationale |
+| :--- | :--- | :--- | :--- |
+| **Deepgram Nova-3** | Vapi Cloud Mode | <250ms | Exceptional code-switching accuracy between Hindi and English (Hinglish). Transcribes Indian colloquial terms ("UPI mandate", "salary date", "GPay") without hallucination. |
+| **Pipecat VAD + Web Speech API** | Self-Hosted Mode | <150ms | Zero-latency browser-native turn detection with automatic silence trimming for smooth barge-in and conversational flow. |
 
-```
-                       ┌───────────────────────────────────────────────┐
-                       │           RecoverAI Engine Selector           │
-                       └───────────────────────┬───────────────────────┘
-                                               │
-                       ┌───────────────────────┴───────────────────────┐
-                       ▼                                               ▼
-     ┌───────────────────────────────────┐           ┌───────────────────────────────────┐
-     │ 🐳 Dograh + Pipecat (Self-Hosted) │           │     ⚡ Vapi AI (Cloud Managed)    │
-     ├───────────────────────────────────┤           ├───────────────────────────────────┤
-     │ • 100% On-Premise Docker (:8080)  │           │ • Turnkey Telephony Cloud         │
-     │ • Zero per-minute API license fees│           │ • Outbound PSTN Dialing to Mobile │
-     │ • Native Hindi & English neural   │           │ • Deepgram STT + ElevenLabs TTS   │
-     │ • Sub-400ms speech synthesis      │           │ • WebRTC In-Browser Calling       │
-     │ • Granular prosody (rate, pitch)  │           │ • Automatic tool-call webhooking  │
-     └───────────────────────────────────┘           └───────────────────────────────────┘
-```
+### B. Text-to-Speech (TTS) Architecture
+| Provider / Model | Pipeline | Target Languages | Key Rationale |
+| :--- | :--- | :--- | :--- |
+| **Microsoft Edge Neural (`edge-tts`)** | Self-Hosted Dograh | Hindi (`hi-IN`), Indian English (`en-IN`), US English (`en-US`) | **Zero-cost per-minute licensing**. Granular programmatic control over acoustic prosody: `rate` (`-6%` to `+2%`) and `pitch` (`-2Hz` to `+2Hz`). Sub-400ms chunked MP3 streaming. |
+| **ElevenLabs Multilingual v2** | Vapi Cloud Mode | English & Hindi | Ultra-realistic human timber, natural breathing pauses, and studio-grade voice presence for enterprise phone calls. |
 
-### A. Dograh + Pipecat Self-Hosted Engine
-- **Runtime Environment**: Python 3.11 Alpine container running Uvicorn + FastAPI on port `8080`.
-- **Speech Synthesis (TTS)**: Direct Microsoft Edge Neural Speech synthesis with custom pitch (`Hz`) and rate (`%`) modification per emotion.
-- **Audio Delivery**: Chunked streaming `audio/mpeg` (MPEG-1 Layer 3 frames) with immediate buffer flush to browser audio elements.
-- **Frame Pipeline**: Pipecat-compatible pipeline orchestration with real-time turn segmentation and tool calling.
+### C. Large Language Model (LLM) & Intent Extraction
+| Tier | Technology | Response Time | Responsibility |
+| :--- | :--- | :--- | :--- |
+| **Deterministic Rule Engine** | Regex / Token Extractors | <5ms | High-precision parameter extraction for dates, amounts, and recovery tool triggers (`schedule_payment_retry`, `send_payment_link`). |
+| **Conversational LLM** | Groq LLaMA 3.3 70B / Claude 3.5 Sonnet | ~280ms | Objection handling, empathetic customer reassurance, and clarification when intents are ambiguous. |
 
-### B. Vapi AI Managed Telephony
-- **Protocol**: WebRTC client SDK (`@vapi-ai/web`) combined with REST PSTN dispatcher (`POST /api/vapi/call`).
-- **PSTN Carrier Leg**: Direct outbound calls to real customer mobile numbers with caller ID spoofing authorization.
-- **Tools Schema**: Autonomous function declarations passed dynamically to Vapi assistants:
-  - `schedule_payment_retry(targetDate)`
-  - `send_payment_link(channel)`
-  - `apply_grace_period(days)`
-  - `escalate_to_human(reason)`
+### D. Why Dograh AI?
+Voice agents fail when prompts are written like written customer service emails. Raw TTS engines reading email-style text sound robotic, breathless, and insensitive. **Dograh AI** introduces the **"Write for the Ear, Not the Eye"** framework:
+1. **Punctuation-Driven Prosody**: Deliberate insertion of commas, full stops, ellipses, and question marks to force realistic vocal intervals.
+2. **Acoustic Emotion Presets**: Dynamic rate/pitch manipulation per customer temperament.
+3. **Gender Grammatical Concordance**: Strict agreement for Hindi verb conjugations (`रही हूँ` vs `रहा हूँ`, `समझती हूँ` vs `समझता हूँ`).
 
 ---
 
-## 4. Dograh AI Screenplay Prosody Architecture: "Write for the Ear"
+## 4. Fallback & Failover Pipeline (High-Availability Circuit Breaker)
 
-Voice models synthesized from raw written text sound robotic and abrupt because human speech relies heavily on breathing intervals, cadence drops, and tonal inflection. RecoverAI enforces Dograh's **Screenplay Script Formatting**:
+RecoverAI implements a multi-tier fallback circuit to guarantee zero downtime during recovery campaigns:
 
-### Prosody Punctuation Rules
+```mermaid
+flowchart TD
+    START["Inbound Recovery Call Trigger"] --> CHECK{"Self-Hosted Dograh Container (:8080)<br/>Health Check"}
+    
+    CHECK -->|Healthy| DOGRAH_RUN["🐳 Execute via Dograh + Pipecat<br/>(Sub-400ms Edge-TTS · Local Docker)"]
+    CHECK -->|Unresponsive / Timeout| VAPI_FALLBACK["⚡ Auto-Failover: Vapi AI Cloud<br/>(Deepgram Nova-3 + ElevenLabs)"]
+    
+    DOGRAH_RUN --> CALL_OUTCOME{"Customer Telephony Pickup?"}
+    VAPI_FALLBACK --> CALL_OUTCOME
+    
+    CALL_OUTCOME -->|Answered| CONVERSE["Live Conversational Voice Recovery"]
+    CALL_OUTCOME -->|No Answer / Busy / DND| MULTI_CHANNEL["Fallback Channel Auto-Dispatch"]
+    
+    MULTI_CHANNEL --> WA["📱 WhatsApp 1-Click Interactive Button Link (India)"]
+    MULTI_CHANNEL --> SMS["💬 SMS Secure Payment URL (US)"]
+```
 
-| Symbol | Grammatical Name | Acoustic Manifestation | Duration | Implementation Example |
+1. **Service-Level Fallback**: If the local Docker container (`:8080`) fails health checks, RecoverAI seamlessly re-routes the session to the cloud-managed Vapi engine without disrupting user queues.
+2. **Telephony Fallback**: If an outbound phone call is unanswered or rejected, RecoverAI triggers an automated fallback dispatch sending an interactive 1-click payment link via WhatsApp (India) or SMS (US).
+3. **Audio Synthesis Fallback**: If streaming network jitter occurs, the frontend player gracefully falls back to pre-buffered neural audio frames.
+
+---
+
+## 5. Decision-Based History Scoring Engine
+
+RecoverAI calculates an autonomous **Recovery Probability Score ($0$ to $100\%$)** to classify every failed autopay attempt and dynamically select the optimal recovery playbook:
+
+$$\text{Recovery Score} = w_1 \cdot \text{HPRI} + w_2 \cdot \text{FailureCategoryScore} + w_3 \cdot \text{TierWeight} - \text{Decay}(\Delta t)$$
+
+### Scoring Factors:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ 1. Historical Payment Reliability Index (HPRI) [Weight: 35%]                   │
+│    • 100% = Consistent autopay success over past 12 months                     │
+│    • 75%  = Occasional balance delays, but always resolved within 3 days        │
+│    • 30%  = Frequent chronic mandate rejections                                │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ 2. Payment Failure Root Cause Weighting [Weight: 25%]                           │
+│    • Insufficient Balance on Salary Date (Score: 90% - Highly Recoverable)      │
+│    • e-NACH Mandate Limit Exhausted     (Score: 75% - Link Re-dispatch)         │
+│    • Card Expired / Reissued            (Score: 50% - Requires Grace Period)    │
+│    • Account Frozen / Blocked           (Score: 20% - Requires Human Attention) │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ 3. Customer Lifetime Value & Tier [Weight: 20%]                                 │
+│    • Enterprise ($2k+ / ₹50k+ ARR)      (Score: 95% - High Priority Dedicated)  │
+│    • Growth / Pro Tier                  (Score: 80% - Autonomous Voice Call)    │
+│    • Starter / Basic Tier               (Score: 65% - Digital Link First)       │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│ 4. Dunning Decay Function [Weight: 20%]                                         │
+│    • Decay Rate: -5% per 12 hours post-webhook event                            │
+│    • Immediate (<2 hours): Full Score (100%)                                    │
+│    • Delayed (>48 hours): Significant churn probability elevation               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Action Strategy Mapping:
+- **Score $\ge 80\%$ (High Probability)**: Autonomous empathetic voice call + Smart retry alignment with upcoming salary/payroll cycle.
+- **Score $50\% - 79\%$ (Moderate Probability)**: Reassuring voice call + Instant 1-click WhatsApp/SMS link dispatch.
+- **Score $< 50\%$ (High Churn Risk)**: Immediate 7-day grace extension + Instant escalation to dedicated Customer Success Representative.
+
+---
+
+## 6. Security Sentinels & Regulatory Compliance
+
+1. **PCI-DSS Level 1 Zero-CVV Sentinel**: The conversational voice agent is cryptographically restricted from soliciting or recording CVVs, OTPs, or NetBanking passwords. Recovery is executed via tokenized UPI mandate retries or pre-filled secure checkout links.
+2. **TRAI 140-Series & NCPR DND Sentinel**: Enforces Indian telecom guidelines: calls are restricted between 9:00 AM and 9:00 PM IST, and National Consumer Preference Register (NCPR) DND registries are checked pre-call.
+3. **Anti-Harassment Dunning Limit**: Strict rate limiting allows a maximum of 2 voice contact attempts per failed billing event.
+4. **Customer Agitation Sentinel**: Real-time sentiment analysis monitors acoustic stress and negative keywords; upon detection, the call is de-escalated and seamlessly transferred to human staff.
+
+---
+
+## 7. Supported Languages & Accents
+
+| Language Code | Display Name | Regional Market | Primary Neural Models | Punctuation Standard |
 | :--- | :--- | :--- | :--- | :--- |
-| `,` | **Comma** | Breathing micro-pause, pitch hold | 150ms – 250ms | `नमस्ते विक्रम शर्मा जी, चिंता की कोई बात नहीं है...` |
-| `.` / `।` | **Full Stop / Poornaviram** | Downward terminal cadence, sentence finality | 350ms – 450ms | `...यह एक अस्थायी बैंक समस्या है। आपकी सेवा बिना रुकावट जारी रहेगी।` |
-| `...` | **Ellipsis** | Reflective pause, softening before sensitive debt discussion | 450ms – 550ms | `मैं समझता हूँ... billing notices can feel frustrating...` |
-| `?` | **Question Mark** | Terminal rising pitch (turn-taking prompt) | Turn Handshake | `...क्या हम शुक्रवार की सैलरी डेट पर ऑटोपे री-ट्राई शेड्यूल करें?` |
-| `!` | **Exclamation** | Upward energy cadence for positive reassurance | Instant | `Done! I have rescheduled your retry for Friday.` |
+| `hi` | **हिंदी (Hindi)** | India Domestic | `hi-IN-SwaraNeural`, `hi-IN-MadhurNeural` | Devanagari with Poornaviram (`।`), Commas (`,`), and Honorifics (`जी`, `नमस्ते`) |
+| `en-IN` | **Indian English** | India Tech & Corporate | `en-IN-NeerjaNeural`, `en-IN-PrabhatNeural` | Indian conversational English with native banking terminology (UPI, e-NACH, NEFT) |
+| `en-US` | **US English** | US SaaS & Enterprise | `en-US-AriaNeural`, `en-US-JennyNeural`, `en-US-GuyNeural` | Standard American enterprise English with ACH and payroll date terminology |
 
 ---
 
-## 5. Multi-Emotion Behavioral Profiling & Acoustic Physics
-
-RecoverAI provides 4 distinct behavioral emotion profiles that mathematically modulate the acoustic prosody parameters:
+## 8. Screenplay Prosody & Emotion Math
 
 ```python
 EMOTION_PROFILES = {
     "empathetic": {
         "label": "Empathetic & Caring",
         "icon": "💖",
-        "rate": "-4%",       # Slower cadence signals attentive listening and care
-        "pitch": "+2Hz",     # Slightly elevated pitch softens tone, preventing perceived hostility
+        "rate": "-4%",       # Slower cadence signals attentive listening and warmth
+        "pitch": "+2Hz",     # Elevated pitch softens tone, preventing defensive reactions
         "intent_bias": "grace_extension",
     },
     "reassuring": {
         "label": "Reassuring & Grounded",
         "icon": "🤝",
-        "rate": "+0%",       # Natural cadence
+        "rate": "+0%",       # Natural conversational tempo
         "pitch": "-1Hz",     # Lower, grounded pitch delivers authoritative security
         "intent_bias": "salary_retry",
     },
     "de_escalating": {
         "label": "De-escalating & Patient",
         "icon": "🛡️",
-        "rate": "-6%",       # Deliberately slowed tempo breaks escalating customer tension
-        "pitch": "-2Hz",     # Resonant chest register conveys steady, unshakeable calm
+        "rate": "-6%",       # Deliberately slowed tempo de-escalates customer tension
+        "pitch": "-2Hz",     # Resonant lower register conveys steady calm
         "intent_bias": "escalate_to_human",
     },
     "professional": {
         "label": "Professional & Concise",
         "icon": "👔",
-        "rate": "+2%",       # Crisp, efficient enterprise tempo
-        "pitch": "+0Hz",     # Standard conversational pitch
+        "rate": "+2%",       # Crisp, efficient enterprise cadence
+        "pitch": "+0Hz",     # Neutral pitch
         "intent_bias": "payment_link",
     },
 }
 ```
-
----
-
-## 6. Neural Voice Model Routing & Grammatical Concordance
-
-Acoustic models are dynamically bound to the customer's region, language, agent persona gender, and emotional intensity:
-
-### Matrix of Neural Voice Models
-
-| Region & Language | Agent Gender | Emotion Style | Neural Voice Model | Persona Name | Grammatical Agreement |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **🇮🇳 Hindi (hi)** | Female | Empathetic / Reassuring | `hi-IN-SwaraNeural` | रिया (Riya) | `बात कर रही हूँ`, `समझती हूँ`, `सकती हूँ` |
-| **🇮🇳 Hindi (hi)** | Male | De-escalating / Reassuring | `hi-IN-MadhurNeural` | रोहन (Rohan) | `बात कर रहा हूँ`, `समझता हूँ`, `सकता हूँ` |
-| **🇮🇳 Indian English (en-IN)** | Female | Empathetic / Professional | `en-IN-NeerjaNeural` | Riya | Natural Indian conversational English |
-| **🇮🇳 Indian English (en-IN)** | Male | Reassuring / Professional | `en-IN-PrabhatNeural` | Rohan | Grounded Indian business English |
-| **🇺🇸 US English (en-US)** | Female | Empathetic / De-escalating | `en-US-AriaNeural` | Sarah | Expressive emotional range, high warmth |
-| **🇺🇸 US English (en-US)** | Female | Professional / Reassuring | `en-US-JennyNeural` | Sarah | Clear, crisp corporate enterprise tone |
-| **🇺🇸 US English (en-US)** | Male | Empathetic / Reassuring | `en-US-GuyNeural` | Alex | Friendly, approachable American tone |
-
----
-
-## 7. Segregated Regional Banking Rails & Customer Queues
-
-RecoverAI segregates its customer records and recovery logic by geography to account for vastly different banking rails and compliance frameworks:
-
-```
-                                  RecoverAI Regional Routing
-                                              │
-                    ┌─────────────────────────┴─────────────────────────┐
-                    ▼                                                   ▼
-       🇮🇳 India Domestic Queue                             🇺🇸 United States Queue
-    ───────────────────────────────                     ───────────────────────────────
-    • Currency: INR (₹)                                 • Currency: USD ($)
-    • Rails: UPI Autopay, e-NACH, RuPay                • Rails: ACH Direct Debit, Stripe, Amex
-    • Clearing: NPCI / RBI Mandate Rules                • Clearing: FedACH / NACHA Rules
-    • Retry Timing: Indian Salary Date (1st / 5th)      • Retry Timing: Bi-weekly Friday Payroll
-    • Recovery Channels: WhatsApp 1-Click UPI           • Recovery Channels: SMS 1-Click WebLink
-    • Banks: HDFC, ICICI, SBI, Axis, Kotak             • Banks: JPMorgan Chase, SVB, BofA, Wells Fargo
-```
-
----
-
-## 8. Autonomous Recovery Action Execution Engine
-
-When a customer consents during a call, the voice turn processor extracts parameters and triggers autonomous recovery tools:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Customer Speech
-    participant V as Voice Engine (Dograh / Vapi)
-    participant E as Execution Engine
-    participant DB as Recovery State Store
-    participant N as Notification Gateway (WhatsApp/SMS)
-
-    C->>V: "My salary arrives on the 5th, retry then"
-    V->>V: Intent Recognition: schedule_payment_retry(targetDate="2026-10-07")
-    V->>E: Execute Tool: schedule_payment_retry
-    E->>DB: Update Mandate Retry Queue (Status: "RETRY_SCHEDULED")
-    E->>N: Dispatch SMS Confirmation & Calendar Hold
-    E-->>V: Tool Response: {"status":"scheduled", "date":"2026-10-07"}
-    V->>C: "Done! I've rescheduled the automated payment retry for 2026-10-07..."
-```
-
-### Action Types & Handlers
-1. **`schedule_payment_retry`**: Automatically updates the autopay engine to pause dunning and schedule an automated re-debit attempt aligned with the customer's upcoming payroll date.
-2. **`send_payment_link`**: Dispatches a tokenized, pre-filled 1-click Razorpay payment link via WhatsApp (India) or SMS (US) allowing instant recovery via alternate rails (Cards, NetBanking, Apple Pay).
-3. **`apply_grace_period`**: Freezes subscription termination for 7 business days while a stolen or expired card is reissued by the customer's bank.
-4. **`escalate_to_human`**: Performs an instantaneous warm transfer to an enterprise customer success manager when complex pricing or churn threats are detected.
-
----
-
-## 9. Security, Privacy & DPDP / TRAI Compliance
-
-1. **HMAC Webhook Verification**: All incoming payment failure webhooks are validated against the merchant's secret key using SHA-256 HMAC signatures.
-2. **PCI-DSS Level 1 Isolation**: The voice agent never prompts for or stores raw CVVs or UPI PINs; all payments are routed through tokenized 1-click links or automated mandate retries.
-3. **TRAI 140-Series & NCPR DND Rules**: Outbound telephony obeys Indian telecom calling windows (9:00 AM to 9:00 PM IST) and respects customer DND preferences.
-4. **Audio Stream Ephemerality**: In self-hosted mode, speech synthesis streams directly to client memory buffers without persistent audio file storage on disk.

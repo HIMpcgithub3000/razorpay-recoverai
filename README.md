@@ -12,7 +12,49 @@
 
 **An enterprise-grade, dual-engine autonomous AI voice agent platform designed to recover failed recurring subscriptions and autopayments across India (UPI Autopay / e-NACH) and the United States (ACH Direct Debit / Stripe).**
 
-[Architecture Spec](./ARCHITECTURE.md) • [Live Dashboard](http://localhost:3000) • [API Documentation](#-api--webhook-reference) • [Docker Quickstart](#-docker--quickstart)
+[Architecture Specification](./ARCHITECTURE.md) • [Live Dashboard](http://localhost:3000) • [System Design](#-system-design-architecture) • [UI Screenshots](#-user-interface-tour) • [Docker Quickstart](#-docker--quickstart)
+
+</div>
+
+---
+
+## 📸 User Interface Tour
+
+<div align="center">
+
+### 1. Landing Page & Autonomous Recovery Console
+*Production Razorpay Design System with real-time recovery metrics and one-click failure injection.*
+<img src="./docs/screenshots/01-landing-page.png" alt="Razorpay RecoverAI Landing Page" width="900" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);" />
+
+---
+
+### 2. Live Call Studio & Audio Waveform Visualizer
+*Bilingual voice studio with Siri GLSL waveform, interactive audio playback, and active neural voice routing.*
+<img src="./docs/screenshots/02-live-voice-studio.png" alt="Live Call Studio with Waveform Visualizer" width="900" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);" />
+
+---
+
+### 3. Realtime Hindi Bilingual Conversation Stream
+*Dograh AI screenplay prosody with full stop/comma cadence, grammatical concordance (`रही हूँ`), and autonomous tool execution.*
+<img src="./docs/screenshots/03-hindi-bilingual-call.png" alt="Bilingual Hindi Voice Recovery Stream" width="900" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);" />
+
+---
+
+### 4. Segregated Customer Queue (India ₹ vs US $)
+*Split market queues: Domestic UPI Autopay / e-NACH in INR vs US ACH Direct Debit / Stripe in USD.*
+<img src="./docs/screenshots/04-customer-queue-regional.png" alt="Regional Customer Queue Table" width="900" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);" />
+
+---
+
+### 5. Financial Analytics & Churn Reduction KPIs
+*Track recovered Annual Recurring Revenue (ARR), recovery probabilities, and payment rail success percentages.*
+<img src="./docs/screenshots/05-recovery-analytics.png" alt="RecoverAI Financial Analytics" width="900" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);" />
+
+---
+
+### 6. Payment Failure Webhook Event Simulator
+*Simulate failed recurring billing events across HDFC, ICICI, SBI, JPMorgan Chase, and SVB with custom failure reasons.*
+<img src="./docs/screenshots/06-webhook-failure-simulator.png" alt="Payment Failure Webhook Simulator" width="900" style="border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);" />
 
 </div>
 
@@ -24,274 +66,165 @@ When a recurring subscription autopayment fails, traditional platforms rely on p
 
 - **30%–50% of total SaaS and OTT subscriber churn is involuntary**, caused purely by technical billing failure rather than active customer cancellation.
 - In India, **UPI Autopay and e-NACH mandates** frequently fail due to timing mismatches with the customer's monthly salary credit date.
-- In the US, **ACH Direct Debit and corporate corporate cards** decline due to quarterly budget cycle changes or temporary payroll delays.
+- In the US, **ACH Direct Debit and corporate cards** decline due to quarterly budget cycle changes or temporary payroll delays.
 
 **Razorpay RecoverAI** solves this by instantaneously intercepting payment failure events and deploying an empathetic, conversational AI voice recovery agent that talks to the customer, understands why the payment failed, negotiates an optimal resolution, and executes autonomous recovery actions in real time.
 
 ---
 
-## 🚀 Key Features & Capabilities
+## 📐 System Design & Architecture
 
-### 1. 🎙️ Dual-Engine Voice Architecture (Zero Lock-in)
-- **🐳 Dograh + Pipecat (Self-Hosted Docker)**: 100% on-premise audio pipeline running on port `8080`. Employs Microsoft Edge Neural synthesis with sub-400ms generation, streaming MP3 audio directly to client buffers without per-minute cloud API bills.
-- **⚡ Vapi AI (Cloud Managed)**: Turnkey enterprise telephony with Deepgram Nova-3 speech-to-text, ElevenLabs multilingual voices, and direct outbound PSTN phone dialing to real customer mobile devices.
+```mermaid
+flowchart TB
+    subgraph WebhookSource["Payment Gateways & Banking Rails"]
+        RZP["Razorpay Core Webhook Engine<br/>(UPI Autopay · e-NACH · Cards)"]
+        STRIPE["Stripe Billing Webhook<br/>(US ACH · Corporate Amex)"]
+        CORE_BANK["Core Banking NPCI Switch<br/>(HDFC, ICICI, SBI, Chase, SVB)"]
+    end
 
-### 2. 🎭 Dograh AI Screenplay Prosody ("Write for the Ear, Not the Eye")
-Pioneers acoustic punctuation rules so voice agents never sound like robotic email readers:
-- **Commas (`,`)**: 150ms–250ms breathing micro-pauses with sustained vocal pitch.
-- **Full Stops (`.` / `।`)**: 350ms–450ms downward cadence drops signaling sentence completion.
-- **Ellipses (`...`)**: 500ms empathetic hesitation before sensitive billing discussions.
-- **Question Marks (`?`)**: Syllable pitch lift inviting natural conversational turn-taking.
+    subgraph Ingestion["Ingestion & Intelligence Layer"]
+        WH_API["/api/webhooks/payment-failure<br/>(HMAC-SHA256 Signature Verification)"]
+        DECISION["Decision & Recovery Scoring Engine<br/>(HPRI Scoring · Churn Risk · Rail Analysis)"]
+        QUEUE["Segregated Regional Queue<br/>🇮🇳 India Domestic (INR) · 🇺🇸 US Enterprise (USD)"]
+    end
 
-### 3. 💖 4 Multi-Emotion Behavioral Profiles
-Voice rate and pitch dynamically adjust according to the customer's emotional posture:
-- **Empathetic (`💖`)**: `-4%` rate, `+2Hz` pitch — Gentle warmth, soft pacing, sympathetic pauses.
-- **Reassuring (`🤝`)**: `+0%` rate, `-1Hz` pitch — Grounded confidence, authoritative security.
-- **De-escalating (`🛡️`)**: `-6%` rate, `-2Hz` pitch — Slower tempo, low pitch to calm frustrated subscribers.
-- **Professional (`👔`)**: `+2%` rate, `+0Hz` pitch — Crisp, brisk enterprise business cadence.
+    subgraph Sentinels["Security & Policy Sentinels"]
+        SENT_PCI["🛡️ PCI-DSS Zero-CVV Sentinel<br/>(Blocks raw PIN / CVV collection)"]
+        SENT_TRAI["⏰ TRAI 9AM–9PM & DND Sentinel<br/>(Enforces legal calling windows)"]
+        SENT_RATE["🛑 Dunning Anti-Harassment Sentinel<br/>(Max 2 recovery calls / event)"]
+        SENT_EMO["⚡ Customer Agitation Sentinel<br/>(Triggers immediate human escalation)"]
+    end
 
-### 4. 👥 Gender-Discriminated Neural Voice Models
-- **Female Personas (Riya / Sarah)**: Powered by `hi-IN-SwaraNeural` (Hindi), `en-US-AriaNeural` / `en-US-JennyNeural` (US), and `en-IN-NeerjaNeural` (Indian English). Employs strict Hindi grammatical concord (`बात कर रही हूँ`, `समझती हूँ`).
-- **Male Personas (Rohan / Alex)**: Powered by `hi-IN-MadhurNeural` (Hindi), `en-US-GuyNeural` (US), and `en-IN-PrabhatNeural` (Indian English). Adheres to masculine grammatical concord (`बात कर रहा हूँ`, `समझता हूँ`).
+    subgraph DualVoiceEngine["Dual Voice Recovery Orchestration"]
+        subgraph SelfHosted["🐳 Primary: Dograh + Pipecat Service (:8080)"]
+            FASTAPI["FastAPI Media Bridge"]
+            PROSODY["Dograh Screenplay Prosody Engine<br/>(, . ... ? Acoustic Shaping)"]
+            EDGE_TTS["Microsoft Neural Edge-TTS Engine<br/>(Swara · Madhur · Aria · Guy · Neerja)"]
+            PIPECAT["Pipecat Audio Frame Pipeline<br/>(16kHz PCM · WebSocket Streaming)"]
+        end
 
-### 5. 🌐 Segregated Regional Queues & Banking Rails
-- **🇮🇳 India Domestic Queue (8 Profiles)**: Denominated in INR (`₹`), integrating UPI Autopay, e-NACH Mandates, RuPay, and domestic banks (HDFC, ICICI, SBI, Axis, Kotak). Supports salary-date retries and 1-click WhatsApp UPI links.
-- **🇺🇸 US Enterprise Queue (8 Profiles)**: Denominated in USD (`$`), integrating ACH Direct Debit, Stripe Recurring, and US financial institutions (JPMorgan Chase, Silicon Valley Bank, Bank of America, Wells Fargo). Supports bi-weekly Friday payroll alignments and 1-click SMS links.
+        subgraph FullService["⚡ Secondary / Fallback: Vapi AI Cloud"]
+            DEEPGRAM["Deepgram Nova-3 STT<br/>(Hinglish & English Code-Switching)"]
+            VAPI_CORE["Vapi In-Call State Machine"]
+            ELEVEN["ElevenLabs Multilingual v2 TTS"]
+            PSTN["Twilio / Vonage PSTN Phone Dialing"]
+        end
 
-### 6. ⚙️ Autonomous In-Call Recovery Actions
-During the call, the voice turn processor extracts intents and triggers automated backend tools:
-1. `schedule_payment_retry`: Automatically delays dunning and schedules an automated mandate retry on customer's salary date.
-2. `send_payment_link`: Dispatches a tokenized 1-click payment link via WhatsApp (India) or SMS (US).
-3. `apply_grace_period`: Extends account access for 7 days when a card is lost or expired.
-4. `escalate_to_human`: Instant warm transfer to senior customer success personnel for retention discussions.
+        CIRCUIT["Circuit Breaker & Fallback Router<br/>(Health Ping · Auto-Failover to Secondary)"]
+    end
 
----
+    subgraph ActionExecution["Autonomous Recovery Actions"]
+        RETRY["Schedule Smart Autopay Retry<br/>(Aligned to Payroll / Salary Date)"]
+        LINK_DISPATCH["Dispatch 1-Click Payment Link<br/>(WhatsApp UPI / SMS Apple Pay)"]
+        GRACE["Apply 7-Day Service Grace Extension"]
+        ESCALATE["Warm Transfer to Human Specialist"]
+    end
 
-## 🛠️ Architecture & System Topology
+    RZP & STRIPE & CORE_BANK --> WH_API
+    WH_API --> Sentinels
+    Sentinels --> DECISION
+    DECISION --> QUEUE
+    QUEUE --> CIRCUIT
 
-For detailed diagrams and architectural specifications, review the [ARCHITECTURE.md](./ARCHITECTURE.md) document.
+    CIRCUIT -->|Health: OK| FASTAPI
+    CIRCUIT -->|Failover / Down| VAPI_CORE
 
-```
-Incoming Webhook (Razorpay / Stripe)
-                 │
-                 ▼
-   Autonomous Decision Engine  ──► Risk Score & Intent Profiling
-                 │
-                 ▼
-      Regional Queue Split  ──► 🇮🇳 India (INR) vs 🇺🇸 US (USD)
-                 │
-                 ▼
-     Voice Engine Resolution  ──► 🐳 Dograh+Pipecat OR ⚡ Vapi AI
-                 │
-                 ├─► Punctuation Prosody Formatting (, . ... ?)
-                 ├─► Emotion Tuning (Rate: -6%..+2%, Pitch: -2Hz..+2Hz)
-                 └─► Gender Model Selection (Swara, Madhur, Aria, Guy)
-                 │
-                 ▼
-     Autonomous Action Trigger  ──► Retry / WhatsApp / Grace / Escalate
-```
+    FASTAPI --> PROSODY --> EDGE_TTS & PIPECAT
+    VAPI_CORE --> DEEPGRAM & ELEVEN & PSTN
 
----
-
-## 📦 Directory Structure
-
-```bash
-raazorpay/
-├── ARCHITECTURE.md                  # Comprehensive Architecture & Technical Spec
-├── README.md                        # Documentation & Quickstart
-├── docker-compose.dograh-pipecat.yml # Docker compose for self-hosted Dograh agent
-├── dograh-pipecat-service/          # Python 3.11 FastAPI + Pipecat voice service
-│   ├── Dockerfile                   # Docker image definition
-│   ├── requirements.txt             # edge-tts, fastapi, uvicorn, pipecat-ai
-│   └── server.py                    # Voice session, emotion prosody, & TTS streaming
-├── src/
-│   ├── app/                         # Next.js App Router (Turbopack)
-│   │   ├── page.tsx                 # RecoverAI Landing Page & Live Dashboard
-│   │   ├── layout.tsx               # Root layout & theme providers
-│   │   └── api/
-│   │       ├── dograh/[...path]/    # Proxy bridge to Dograh Docker (:8080)
-│   │       ├── vapi/call/           # Vapi PSTN outbound call dispatcher
-│   │       └── webhooks/            # Payment failure & voice webhooks
-│   ├── components/dashboard/        # Production UI Components
-│   │   ├── LiveCallStudio.tsx       # Live Studio, Waveform, Audio Player, Dograh Card
-│   │   ├── CustomerQueueTable.tsx   # Regional queue table (India vs US filter tabs)
-│   │   ├── KPICards.tsx             # Financial recovery metrics & ARR saved
-│   │   ├── FailureSimulatorModal.tsx# Razorpay webhook event simulator
-│   │   ├── VapiPhoneModal.tsx       # Real outbound PSTN dialer modal
-│   │   └── ApiDocsView.tsx          # Interactive API documentation
-│   └── lib/
-│       ├── data/customers.ts        # 16 segregated customer dossiers (8 IN, 8 US)
-│       ├── store/recovery-store.ts  # Zustand reactive recovery state
-│       └── engine/decision-engine.ts# AI recovery strategy & risk modeling
+    FASTAPI & VAPI_CORE --> RETRY & LINK_DISPATCH & GRACE & ESCALATE
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🧠 AI Mesh: STT, TTS, LLM & Dograh AI Rationale
+
+### 1. Speech-to-Text (STT): Deepgram Nova-3 + Pipecat VAD
+- **Why Deepgram Nova-3?** Sub-250ms streaming transcription with best-in-class bilingual code-switching (Hinglish/English). Correctly interprets colloquial Indian financial vocabulary ("UPI Autopay", "e-NACH mandate", "GPay") where standard STT models fail.
+- **Why Pipecat VAD?** Delivers client-side Voice Activity Detection with ultra-low latency silence detection to support seamless conversational barge-in without cutting the customer off.
+
+### 2. Text-to-Speech (TTS): Microsoft Edge Neural (`edge-tts`) + ElevenLabs
+- **Why Microsoft Edge Neural?** **Zero per-minute licensing costs**. Provides native Indian neural voices (`hi-IN-SwaraNeural`, `hi-IN-MadhurNeural`, `en-IN-NeerjaNeural`, `en-IN-PrabhatNeural`) and US voices (`en-US-AriaNeural`, `en-US-JennyNeural`, `en-US-GuyNeural`) with programmatic manipulation of acoustic `rate` (`-6%` to `+2%`) and `pitch` (`-2Hz` to `+2Hz`).
+- **Why ElevenLabs?** Used in Vapi cloud mode for hyper-realistic human timber, natural breathing pauses, and studio-grade voice presence for enterprise phone calls.
+
+### 3. Large Language Model (LLM) & Intent Extraction
+- **Hybrid Intent Architecture**: High-speed deterministic regex/pattern extractors (<5ms) identify recovery actions (`schedule_payment_retry`, `send_payment_link`, `apply_grace_period`, `escalate_to_human`).
+- **Groq LLaMA 3.3 / Claude 3.5 Sonnet**: Provides conversational objection handling, empathetic reassurance, and contextual dialog when customer inputs are unstructured.
+
+### 4. Why Dograh AI? ("Write for the Ear, Not the Eye")
+Raw text synthesized by neural TTS sounds robotic, breathless, and unnatural because humans speak with pauses and melodic pitch drops. **Dograh AI** enforces screenplay prosody rules:
+- **Commas (`,`)**: ~150ms–250ms breathing micro-pause and sustained continuation pitch.
+- **Full Stops (`.` / `।`)**: ~350ms–450ms downward cadence drops marking finality.
+- **Ellipses (`...`)**: ~450ms–550ms empathetic pause before sensitive financial details.
+- **Question Marks (`?`)**: Upward pitch inflection inviting conversational turn-taking.
+
+---
+
+## 🛡️ Fallback & Failover Pipeline (High Availability)
+
+To ensure zero downtime during high-volume recurring billing cycles:
+1. **Container Health Circuit Breaker**: If the self-hosted Dograh Docker container (`:8080`) is unresponsive, the platform automatically triggers zero-loss failover to Vapi AI Cloud.
+2. **Telephony Failover to Digital Rails**: If an outbound voice call is unanswered or rejected, RecoverAI instantly triggers a secondary channel fallback, sending an interactive 1-click payment link via WhatsApp (India) or SMS (US).
+3. **Audio Buffer Fallback**: If network degradation occurs during streaming, client players failover to pre-buffered prosody audio chunks.
+
+---
+
+## 📈 Decision-Based History Scoring Engine
+
+RecoverAI calculates an autonomous **Recovery Probability Score (0% to 100%)** using a multi-factor historical weighting model:
+
+$$\text{Recovery Score} = 0.35 \times \text{HPRI} + 0.25 \times \text{RootCause} + 0.20 \times \text{Tier} - \text{Decay}(\Delta t)$$
+
+| Factor | Weight | Evaluation Criteria |
+| :--- | :---: | :--- |
+| **Historical Payment Reliability (HPRI)** | **35%** | Track record of successful autopay cycles over the past 12 months. |
+| **Failure Root Cause Weighting** | **25%** | Insufficient balance on salary date (90% recoverable) vs. Expired Card (50%) vs. Frozen Account (20%). |
+| **Customer Tier & ARR Value** | **20%** | Enterprise ($2k+ ARR) receives priority voice routing + automatic 7-day grace extension. |
+| **Dunning Decay Penalty** | **20%** | Decay penalty of `-5%` per 12 hours elapsed from failure webhook event. |
+
+---
+
+## 🔒 Security Sentinels & Regulatory Guardrails
+
+1. **PCI-DSS Level 1 Zero-CVV Sentinel**: The conversational voice agent is strictly prohibited from soliciting, transcribing, or storing CVVs, OTPs, or NetBanking passwords.
+2. **TRAI 140-Series & NCPR DND Sentinel**: Restricts outbound phone calls between 9:00 AM and 9:00 PM IST and validates National Customer Preference Register (NCPR) status.
+3. **Anti-Harassment Dunning Sentinel**: Limits automated voice outreach to a maximum of 2 calls per failed billing cycle.
+4. **Customer Agitation Sentinel**: Monitors acoustic stress and negative keywords, automatically triggering warm escalation to a human Customer Success Specialist.
+
+---
+
+## 🌐 Supported Languages & Neural Personas
+
+| Language Code | Language | Accent / Market | Female Persona | Male Persona | Punctuation Standard |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `hi` | **हिंदी** | India Domestic | **रिया** (`hi-IN-SwaraNeural`) | **रोहन** (`hi-IN-MadhurNeural`) | Devanagari Poornaviram (`।`), Commas (`,`), Honorifics (`जी`, `नमस्ते`) |
+| `en-IN` | **Indian English** | India Corporate | **Riya** (`en-IN-NeerjaNeural`) | **Rohan** (`en-IN-PrabhatNeural`) | Indian banking terms (UPI Autopay, e-NACH, Salary Date) |
+| `en-US` | **US English** | US Enterprise | **Sarah** (`en-US-AriaNeural`) | **Alex** (`en-US-GuyNeural`) | US payroll cycles, ACH Direct Debit, Stripe billing |
+
+---
+
+## 🚀 Docker & Quickstart
 
 ### Prerequisites
 - **Node.js**: v18.17+ or v20+
-- **Docker & Docker Compose**: For running the self-hosted Dograh Pipecat service
-- *(Optional)* **Vapi AI Account**: For real outbound PSTN mobile calls
+- **Docker & Docker Compose**: For self-hosted Dograh Pipecat engine
 
----
-
-### Step 1: Clone & Install Dependencies
-
+### Step 1: Start Self-Hosted Dograh Voice Service
 ```bash
-git clone https://github.com/HIMpcgithub3000/razorpay-recoverai.git
-cd razorpay-recoverai
-
-npm install
-```
-
----
-
-### Step 2: Launch Dograh + Pipecat Service via Docker
-
-The self-hosted Dograh voice service runs in an isolated container on port `8080`:
-
-```bash
-# Start the Dograh Pipecat container
 docker compose -f docker-compose.dograh-pipecat.yml up -d
-
-# Verify container health
 curl -s http://localhost:8080/health
 ```
 
-Expected output:
-```json
-{
-  "status": "healthy",
-  "service": "dograh-pipecat-voice-agent",
-  "pipecat_engine": "active",
-  "dograh_integration": "enabled",
-  "supported_languages": ["en", "hi"],
-  "emotion_profiles": {
-    "empathetic": "💖 Empathetic & Caring",
-    "reassuring": "🤝 Reassuring & Grounded",
-    "de_escalating": "🛡️ De-escalating & Patient",
-    "professional": "👔 Professional & Concise"
-  },
-  "self_hosted": true
-}
-```
-
----
-
-### Step 3: Run Next.js Frontend & API Gateway
-
+### Step 2: Install & Start Frontend
 ```bash
+npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-## 📡 API & Webhook Reference
-
-### 1. Ingest Payment Failure Webhook
-Simulates or receives an automated autopay failure notification from payment gateways.
-
-- **Endpoint**: `POST /api/webhooks/payment-failure`
-- **Payload**:
-```json
-{
-  "event": "payment.autopay_failed",
-  "customer_id": "cust_in_01",
-  "customer_name": "Vikram Sharma",
-  "amount": 4999.00,
-  "currency": "INR",
-  "region": "IN",
-  "bank_name": "HDFC Bank",
-  "card_brand": "HDFC UPI Autopay",
-  "failure_reason": "Insufficient balance on salary settlement date"
-}
-```
-
----
-
-### 2. Initiate Dograh Voice Session
-Resolves emotion prosody, neural models, and generates a screenplay greeting.
-
-- **Endpoint**: `POST /api/dograh/voice/session`
-- **Payload**:
-```json
-{
-  "customer_name": "Vikram Sharma",
-  "customer_id": "cust_in_01",
-  "company": "TechFlow Solutions",
-  "subscription_plan": "Enterprise Cloud",
-  "card_brand": "HDFC UPI Autopay",
-  "card_last4": "4821",
-  "language": "hi",
-  "region": "IN",
-  "voice_gender": "female",
-  "emotion": "empathetic",
-  "amount": 4999.00,
-  "currency": "INR",
-  "bank_name": "HDFC Bank",
-  "failure_reason": "Insufficient balance on salary settlement date"
-}
-```
-- **Response**:
-```json
-{
-  "session_id": "session_cust_in_01_172798...",
-  "voice": "hi-IN-SwaraNeural",
-  "prosody": { "rate": "-4%", "pitch": "+2Hz" },
-  "greeting": "नमस्ते विक्रम शर्मा जी, चिंता की कोई बात नहीं है... मैं रेज़रपे रिकवरएआई से रिया बात कर रही हूँ...",
-  "tts_url": "/api/dograh/voice/tts?text=...&lang=hi&gender=female&region=IN&emotion=empathetic"
-}
-```
-
----
-
-### 3. Realtime Conversational Voice Turn
-Evaluates customer speech, executes recovery actions, and replies with prosody formatting.
-
-- **Endpoint**: `POST /api/dograh/voice/turn`
-- **Payload**:
-```json
-{
-  "session_id": "session_cust_in_01_...",
-  "message": "मेरी सैलरी 5 तारीख को आती है, तब काट लेना",
-  "language": "hi",
-  "voice_gender": "female",
-  "emotion": "empathetic"
-}
-```
-- **Response**:
-```json
-{
-  "reply": "बहुत बढ़िया, विक्रम शर्मा जी! मैंने आपका पेमेंट रिट्राई 2026-10-07 के लिए शेड्यूल कर दिया है। तब तक आपका सब्सक्रिप्शन पूरी तरह से चालू रहेगा...",
-  "tool_call": {
-    "name": "schedule_payment_retry",
-    "params": { "targetDate": "2026-10-07" }
-  },
-  "prosody": { "rate": "+0%", "pitch": "-1Hz" }
-}
-```
-
----
-
-## 🎨 Razorpay Design System & Themes
-
-RecoverAI is built using modern Razorpay design aesthetics:
-- **Color Palette**: Curated Razorpay Blue (`#0066f5` / `#0c2340`), Emerald accents (`#10b981`), and Indigo secondary tones.
-- **Light & Dark Theme**: One-click theme switch persisted across sessions.
-- **Audio Visualizers**: Live fluid waveform animation and pulsing reactive dots reflecting speech amplitude.
-- **Responsive**: Fully optimized for mobile, tablet, and widescreen enterprise monitoring consoles.
+Open [http://localhost:3000](http://localhost:3000) to view the live RecoverAI console.
 
 ---
 
 ## 🛡️ License
 
 This project is licensed under the MIT License — see the [LICENSE](./LICENSE) file for details.
-
----
-
-<div align="center">
-Built with ❤️ for resilient recurring revenue recovery across India and the United States.
-</div>
