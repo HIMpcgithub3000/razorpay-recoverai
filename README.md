@@ -12,12 +12,13 @@
 
 **An enterprise-grade, dual-engine autonomous AI voice agent platform designed to recover failed recurring subscriptions and autopayments across India (UPI Autopay / e-NACH) and the United States (ACH Direct Debit / Stripe).**
 
-[Architecture Specification](./ARCHITECTURE.md) • [Live Dashboard](http://localhost:3000) • [System Design](#-system-design-architecture) • [UI Screenshots](#-user-interface-tour) • [Docker Quickstart](#-docker--quickstart)
+[Architecture Specification](./ARCHITECTURE.md) • [UI Screenshots](#user-interface-tour) • [Docker Quickstart](#docker-quickstart)
 
 </div>
 
 ---
 
+<a id="user-interface-tour"></a>
 ## 📸 User Interface Tour
 
 <div align="center">
@@ -203,6 +204,7 @@ $$\text{Recovery Score} = 0.35 \times \text{HPRI} + 0.25 \times \text{RootCause}
 
 ---
 
+<a id="docker-quickstart"></a>
 ## 🚀 Docker & Quickstart
 
 ### Prerequisites
@@ -221,7 +223,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the live RecoverAI console.
+Open `http://localhost:3000` in your local browser to view the RecoverAI console.
 
 ---
 
